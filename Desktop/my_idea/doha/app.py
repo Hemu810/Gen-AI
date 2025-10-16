@@ -34,7 +34,7 @@ def db_connector():
     USERNAME = os.getenv("DB_USERNAME")
     PASSWORD = os.getenv("DB_PASSWORD")
     connection_string = (
-        f'DRIVER={{ODBC Driver 18 for SQL Server}};'
+        f'DRIVER={{ODBC Driver 17 for SQL Server}};'
         f'SERVER={SERVER};DATABASE={DATABASE};UID={USERNAME};PWD={PASSWORD};Encrypt=no;'
     )
     return pyodbc.connect(connection_string, timeout=30)
