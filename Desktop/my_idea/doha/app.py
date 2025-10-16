@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from sqlalchemy import create_engine
+import pymssql
 from langchain_community.utilities import SQLDatabase
 from langchain_openai import AzureChatOpenAI
 from langchain_community.agent_toolkits import create_sql_agent
@@ -27,16 +28,26 @@ TABLE_TO_MODULE_MAP = {
     "Trials": "Clinical Trials DB", "Drug": "Drugs DB", "Company": "Companies DB",
 }
 
-# --- SQL Server Connection via python-tds ---
+# --- SQL Server Connection via pymssql.connect ---
 SERVER = os.getenv("DB_SERVER")
+PORT = os.getenv("DB_PORT", "1433")
 DATABASE = os.getenv("DB_DATABASE")
 USERNAME = os.getenv("DB_USERNAME")
 PASSWORD = os.getenv("DB_PASSWORD")
-connection_url = f"mssql+pytds://{USERNAME}:{PASSWORD}@{SERVER}:1433/{DATABASE}"
+
+def db_connector():
+    return pymssql.connect(
+        server=SERVER,
+        port=int(PORT),
+        user=USERNAME,
+        password=PASSWORD,
+        database=DATABASE,
+        timeout=10
+    )
 
 try:
     print("Initializing database engine...")
-    engine = create_engine(connection_url)
+    engine = create_engine("mssql+pymssql://", creator=db_connector, echo=True)
     with engine.connect() as connection:
         print("✅ Database connection successful!")
 except Exception as e:
