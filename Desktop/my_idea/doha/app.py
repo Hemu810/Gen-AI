@@ -1,12 +1,11 @@
 import os
 import sys
-import pyodbc
 import json
 import re
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from langchain_community.utilities import SQLDatabase
 from langchain_openai import AzureChatOpenAI
 from langchain_community.agent_toolkits import create_sql_agent
@@ -28,17 +27,23 @@ TABLE_TO_MODULE_MAP = {
     "Trials": "Clinical Trials DB", "Drug": "Drugs DB", "Company": "Companies DB",
 }
 
-def db_connector():
-    SERVER = os.getenv("DB_SERVER")
-    DATABASE = os.getenv("DB_DATABASE")
-    USERNAME = os.getenv("DB_USERNAME")
-    PASSWORD = os.getenv("DB_PASSWORD")
-    connection_string = (
-        f'DRIVER={{ODBC Driver 17 for SQL Server}};'
-        f'SERVER={SERVER};DATABASE={DATABASE};UID={USERNAME};PWD={PASSWORD};Encrypt=no;'
-    )
-    return pyodbc.connect(connection_string, timeout=30)
+# --- SQL Server Connection via python-tds ---
+SERVER = os.getenv("DB_SERVER")
+DATABASE = os.getenv("DB_DATABASE")
+USERNAME = os.getenv("DB_USERNAME")
+PASSWORD = os.getenv("DB_PASSWORD")
+connection_url = f"mssql+pytds://{USERNAME}:{PASSWORD}@{SERVER}:1433/{DATABASE}"
 
+try:
+    print("Initializing database engine...")
+    engine = create_engine(connection_url)
+    with engine.connect() as connection:
+        print("✅ Database connection successful!")
+except Exception as e:
+    print(f"❌ FAILED TO CONNECT TO DATABASE. Error: {e}")
+    sys.exit(1)
+
+# --- Azure OpenAI Setup ---
 llm = AzureChatOpenAI(
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
     api_key=os.getenv("AZURE_OPENAI_KEY"),
@@ -46,15 +51,6 @@ llm = AzureChatOpenAI(
     azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
     temperature=0,
 )
-
-try:
-    print("Initializing database engine...")
-    engine = create_engine("mssql+pyodbc://", creator=db_connector)
-    with engine.connect() as connection:
-        print("✅ Database connection successful!")
-except Exception as e:
-    print(f"❌ FAILED TO CONNECT TO DATABASE. Error: {e}")
-    sys.exit(1)
 
 # --- API ENDPOINT 1: Proactive Counts AND Data Fetching/Caching ---
 @app.route("/api/query", methods=["POST"])
